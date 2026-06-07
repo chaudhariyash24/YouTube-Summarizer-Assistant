@@ -1,0 +1,2747 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SumTube — AI YouTube Summarizer</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+<!-- jsPDF for PDF download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+/* ============================================
+   CSS VARIABLES & THEME SYSTEM
+   ============================================ */
+:root {
+  --c-bg: #0a0a0f;
+  --c-bg2: #111118;
+  --c-bg3: #18181f;
+  --c-border: rgba(255,255,255,0.07);
+  --c-border2: rgba(255,255,255,0.12);
+  --c-text: #f0f0f5;
+  --c-text2: rgba(240,240,245,0.6);
+  --c-text3: rgba(240,240,245,0.35);
+  --c-accent: #7c6af7;
+  --c-accent2: #a78bfa;
+  --c-accent3: #c4b5fd;
+  --c-red: #ff4d6d;
+  --c-red2: #ff758c;
+  --c-green: #34d399;
+  --c-amber: #fbbf24;
+  --c-glass: rgba(255,255,255,0.04);
+  --c-glass2: rgba(255,255,255,0.08);
+  --shadow: 0 8px 32px rgba(0,0,0,0.5);
+  --shadow2: 0 2px 12px rgba(0,0,0,0.3);
+  --radius: 16px;
+  --radius-sm: 8px;
+  --radius-lg: 24px;
+  --nav-h: 64px;
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+[data-theme="light"] {
+  --c-bg: #f8f8fc;
+  --c-bg2: #ffffff;
+  --c-bg3: #f0f0f8;
+  --c-border: rgba(0,0,0,0.07);
+  --c-border2: rgba(0,0,0,0.13);
+  --c-text: #0f0f1a;
+  --c-text2: rgba(15,15,26,0.6);
+  --c-text3: rgba(15,15,26,0.35);
+  --c-glass: rgba(255,255,255,0.7);
+  --c-glass2: rgba(255,255,255,0.9);
+  --shadow: 0 8px 32px rgba(100,100,150,0.12);
+  --shadow2: 0 2px 12px rgba(100,100,150,0.08);
+}
+
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--c-bg);
+  color: var(--c-text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.3s, color 0.3s;
+}
+a { text-decoration: none; color: inherit; }
+button { cursor: pointer; border: none; font-family: var(--font-body); }
+input, textarea, select { font-family: var(--font-body); }
+img { max-width: 100%; }
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--c-bg); }
+::-webkit-scrollbar-thumb { background: var(--c-bg3); border-radius: 3px; }
+
+/* ============================================
+   GRID NOISE BG
+   ============================================ */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: radial-gradient(circle at 20% 20%, rgba(124,106,247,0.08) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 80%, rgba(167,139,250,0.06) 0%, transparent 50%),
+                    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.025'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============================================
+   PAGES
+   ============================================ */
+.page { display: none; position: relative; z-index: 1; }
+.page.active { display: block; }
+
+/* ============================================
+   NAVBAR
+   ============================================ */
+.navbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--nav-h);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  background: rgba(10,10,15,0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--c-border);
+  z-index: 1000;
+  transition: all 0.3s;
+}
+[data-theme="light"] .navbar { background: rgba(248,248,252,0.8); }
+
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display);
+  font-size: 1.4rem; font-weight: 800;
+  cursor: pointer;
+}
+.nav-logo-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--c-accent), var(--c-red));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.nav-logo span.yt { color: var(--c-red); }
+.nav-logo span.ai { color: var(--c-accent2); }
+
+.nav-links {
+  display: flex; align-items: center; gap: 8px;
+}
+.nav-link {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--c-text2);
+  background: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.nav-link:hover { color: var(--c-text); background: var(--c-glass2); }
+
+.nav-actions { display: flex; align-items: center; gap: 10px; }
+
+.theme-toggle {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--c-glass2);
+  border: 1px solid var(--c-border2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--c-text2);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.theme-toggle:hover { color: var(--c-text); background: var(--c-glass2); transform: scale(1.05); }
+
+.btn-ghost {
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem; font-weight: 500;
+  background: none;
+  border: 1px solid var(--c-border2);
+  color: var(--c-text2);
+  transition: all 0.2s;
+}
+.btn-ghost:hover { border-color: var(--c-accent); color: var(--c-accent); }
+
+.btn-primary {
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem; font-weight: 600;
+  background: linear-gradient(135deg, var(--c-accent), #9b5de5);
+  color: #fff;
+  border: none;
+  transition: all 0.2s;
+  box-shadow: 0 2px 16px rgba(124,106,247,0.3);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(124,106,247,0.45); }
+.btn-primary:active { transform: translateY(0); }
+
+.hamburger {
+  display: none;
+  width: 36px; height: 36px;
+  background: var(--c-glass2);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius-sm);
+  align-items: center; justify-content: center;
+  color: var(--c-text);
+  cursor: pointer;
+}
+
+/* ============================================
+   HERO SECTION
+   ============================================ */
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: calc(var(--nav-h) + 60px) 24px 80px;
+  position: relative;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 16px;
+  border-radius: 100px;
+  border: 1px solid rgba(124,106,247,0.3);
+  background: rgba(124,106,247,0.08);
+  font-size: 0.8rem; font-weight: 500;
+  color: var(--c-accent2);
+  margin-bottom: 28px;
+  animation: fadeInUp 0.6s ease both;
+}
+.hero-badge-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  animation: pulse 2s infinite;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 8vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+  animation: fadeInUp 0.6s 0.1s ease both;
+}
+.hero-title .grad {
+  background: linear-gradient(135deg, var(--c-accent2) 0%, var(--c-red2) 50%, var(--c-amber) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
+  color: var(--c-text2);
+  max-width: 560px;
+  line-height: 1.7;
+  margin-bottom: 40px;
+  animation: fadeInUp 0.6s 0.2s ease both;
+}
+
+.hero-input-wrap {
+  width: 100%; max-width: 640px;
+  display: flex; gap: 10px;
+  padding: 8px;
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+  animation: fadeInUp 0.6s 0.3s ease both;
+  margin-bottom: 20px;
+}
+.hero-input {
+  flex: 1;
+  background: none; border: none; outline: none;
+  color: var(--c-text);
+  font-size: 0.95rem;
+  padding: 6px 12px;
+}
+.hero-input::placeholder { color: var(--c-text3); }
+.hero-cta {
+  padding: 10px 24px;
+  border-radius: calc(var(--radius) - 4px);
+  background: linear-gradient(135deg, var(--c-accent), #9b5de5);
+  color: #fff;
+  font-weight: 600; font-size: 0.9rem;
+  display: flex; align-items: center; gap: 8px;
+  border: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+  box-shadow: 0 2px 16px rgba(124,106,247,0.4);
+}
+.hero-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(124,106,247,0.55); }
+
+.hero-stats {
+  display: flex; align-items: center; gap: 32px;
+  animation: fadeInUp 0.6s 0.4s ease both;
+  flex-wrap: wrap; justify-content: center;
+}
+.hero-stat { text-align: center; }
+.hero-stat-num {
+  font-family: var(--font-display);
+  font-size: 1.5rem; font-weight: 700;
+  color: var(--c-text);
+}
+.hero-stat-label { font-size: 0.8rem; color: var(--c-text3); margin-top: 2px; }
+
+.hero-divider {
+  width: 1px; height: 40px;
+  background: var(--c-border2);
+}
+
+/* Floating orbs */
+.orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(80px); pointer-events: none; opacity: 0.15;
+}
+.orb-1 { width: 500px; height: 500px; background: var(--c-accent); top: 10%; left: -10%; }
+.orb-2 { width: 400px; height: 400px; background: var(--c-red); bottom: 10%; right: -5%; }
+.orb-3 { width: 300px; height: 300px; background: var(--c-amber); top: 50%; left: 50%; transform: translate(-50%,-50%); }
+
+/* ============================================
+   FEATURES SECTION
+   ============================================ */
+.section {
+  padding: 100px 24px;
+  position: relative; z-index: 1;
+}
+.section-inner { max-width: 1200px; margin: 0 auto; }
+.section-label {
+  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--c-accent);
+  margin-bottom: 14px;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800; letter-spacing: -0.025em;
+  margin-bottom: 16px;
+}
+.section-desc { font-size: 1rem; color: var(--c-text2); max-width: 500px; line-height: 1.7; margin-bottom: 60px; }
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(124,106,247,0.04) 0%, transparent 60%);
+  opacity: 0; transition: opacity 0.3s;
+}
+.feature-card:hover { border-color: var(--c-border2); transform: translateY(-3px); box-shadow: var(--shadow); }
+.feature-card:hover::before { opacity: 1; }
+
+.feature-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+}
+.feature-title { font-family: var(--font-display); font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+.feature-desc { font-size: 0.875rem; color: var(--c-text2); line-height: 1.6; }
+
+/* ============================================
+   HOW IT WORKS
+   ============================================ */
+.steps { display: flex; gap: 0; position: relative; }
+.steps::before {
+  content: '';
+  position: absolute; top: 28px; left: 28px; right: 28px;
+  height: 1px; background: var(--c-border2);
+}
+.step { flex: 1; text-align: center; padding: 0 16px; position: relative; z-index: 1; }
+.step-num {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border2);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+  font-family: var(--font-display); font-weight: 700;
+  color: var(--c-accent);
+  transition: all 0.3s;
+}
+.step:hover .step-num { background: var(--c-accent); color: #fff; border-color: var(--c-accent); transform: scale(1.1); }
+.step-title { font-weight: 600; margin-bottom: 6px; font-size: 0.95rem; }
+.step-desc { font-size: 0.82rem; color: var(--c-text2); line-height: 1.5; }
+
+/* ============================================
+   PRICING SECTION
+   ============================================ */
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.pricing-card {
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 32px;
+  transition: all 0.3s;
+}
+.pricing-card.popular {
+  border-color: var(--c-accent);
+  background: linear-gradient(135deg, rgba(124,106,247,0.06) 0%, var(--c-bg2) 100%);
+  box-shadow: 0 0 40px rgba(124,106,247,0.1);
+}
+.pricing-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 100px;
+  background: var(--c-accent);
+  color: #fff;
+  font-size: 0.72rem; font-weight: 600;
+  margin-bottom: 16px;
+  letter-spacing: 0.05em;
+}
+.pricing-name { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+.pricing-price { font-family: var(--font-display); font-size: 2.5rem; font-weight: 800; margin: 16px 0; }
+.pricing-price span { font-size: 1rem; color: var(--c-text2); font-weight: 400; font-family: var(--font-body); }
+.pricing-desc { font-size: 0.82rem; color: var(--c-text2); margin-bottom: 24px; line-height: 1.5; }
+.pricing-features { list-style: none; margin-bottom: 28px; }
+.pricing-features li {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.875rem; padding: 6px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.pricing-features li:last-child { border: none; }
+.check { color: var(--c-green); }
+
+/* ============================================
+   AUTH PAGES (LOGIN / SIGNUP)
+   ============================================ */
+.auth-page {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 100px 24px 60px;
+}
+.auth-card {
+  width: 100%; max-width: 440px;
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  box-shadow: var(--shadow);
+}
+.auth-title {
+  font-family: var(--font-display);
+  font-size: 1.8rem; font-weight: 800;
+  margin-bottom: 6px;
+}
+.auth-sub { font-size: 0.9rem; color: var(--c-text2); margin-bottom: 32px; }
+
+.form-group { margin-bottom: 18px; }
+.form-label { font-size: 0.82rem; font-weight: 500; color: var(--c-text2); margin-bottom: 8px; display: block; }
+.form-input {
+  width: 100%; padding: 12px 16px;
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius-sm);
+  color: var(--c-text); font-size: 0.9rem;
+  outline: none; transition: all 0.2s;
+}
+.form-input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.15); }
+.form-input.error { border-color: var(--c-red); }
+.form-error { font-size: 0.78rem; color: var(--c-red); margin-top: 5px; display: none; }
+.form-error.show { display: block; }
+
+.form-submit {
+  width: 100%; padding: 13px;
+  background: linear-gradient(135deg, var(--c-accent), #9b5de5);
+  color: #fff; font-weight: 600; font-size: 0.95rem;
+  border: none; border-radius: var(--radius-sm);
+  transition: all 0.2s;
+  box-shadow: 0 2px 16px rgba(124,106,247,0.35);
+  margin-top: 8px;
+}
+.form-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(124,106,247,0.5); }
+.form-submit:active { transform: translateY(0); }
+
+.auth-divider {
+  display: flex; align-items: center; gap: 16px;
+  margin: 20px 0;
+  font-size: 0.8rem; color: var(--c-text3);
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--c-border2);
+}
+
+.social-btn {
+  width: 100%; padding: 11px;
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius-sm);
+  color: var(--c-text);
+  font-size: 0.875rem; font-weight: 500;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: all 0.2s;
+  margin-bottom: 10px;
+}
+.social-btn:hover { border-color: var(--c-border2); background: var(--c-glass2); }
+
+.auth-switch { text-align: center; font-size: 0.875rem; color: var(--c-text2); margin-top: 20px; }
+.auth-switch a { color: var(--c-accent); cursor: pointer; font-weight: 500; }
+.auth-switch a:hover { text-decoration: underline; }
+
+/* ============================================
+   DASHBOARD
+   ============================================ */
+.dash {
+  padding: calc(var(--nav-h) + 24px) 24px 60px;
+  max-width: 1200px; margin: 0 auto;
+}
+.dash-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 32px; flex-wrap: wrap; gap: 16px;
+}
+.dash-welcome { font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; }
+.dash-sub { color: var(--c-text2); font-size: 0.9rem; margin-top: 4px; }
+.dash-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Stats row */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px; margin-bottom: 32px;
+}
+.stat-card {
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: all 0.2s;
+}
+.stat-card:hover { border-color: var(--c-border2); transform: translateY(-2px); }
+.stat-label { font-size: 0.78rem; color: var(--c-text2); font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; }
+.stat-value { font-family: var(--font-display); font-size: 1.8rem; font-weight: 800; }
+.stat-change { font-size: 0.75rem; }
+.stat-change.up { color: var(--c-green); }
+.stat-change.down { color: var(--c-red); }
+
+/* Summarizer Box */
+.summarizer-box {
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius);
+  padding: 28px; margin-bottom: 28px;
+}
+.summarizer-title { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+
+.url-row { display: flex; gap: 10px; margin-bottom: 20px; }
+.url-input {
+  flex: 1; padding: 12px 16px;
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius-sm);
+  color: var(--c-text); font-size: 0.9rem;
+  outline: none; transition: all 0.2s;
+}
+.url-input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.15); }
+
+.options-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; margin-bottom: 16px;
+}
+.select-styled {
+  padding: 10px 14px;
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius-sm);
+  color: var(--c-text); font-size: 0.875rem;
+  outline: none; cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+.select-styled:focus { border-color: var(--c-accent); }
+
+.toggle-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.toggle-btn {
+  padding: 6px 14px;
+  border-radius: 100px;
+  border: 1px solid var(--c-border2);
+  background: none;
+  color: var(--c-text2); font-size: 0.8rem; font-weight: 500;
+  transition: all 0.2s; cursor: pointer;
+}
+.toggle-btn.active {
+  background: rgba(124,106,247,0.12);
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+.toggle-btn:hover { border-color: var(--c-accent2); color: var(--c-text); }
+
+/* Summary Output */
+.summary-output {
+  display: none;
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 20px;
+  animation: fadeInUp 0.4s ease;
+}
+.summary-output.show { display: block; }
+
+.output-tabs {
+  display: flex; border-bottom: 1px solid var(--c-border2);
+  background: var(--c-bg2); overflow-x: auto;
+}
+.output-tab {
+  padding: 12px 18px; font-size: 0.82rem; font-weight: 500;
+  color: var(--c-text2); background: none; border: none;
+  border-bottom: 2px solid transparent; cursor: pointer;
+  white-space: nowrap; transition: all 0.2s;
+}
+.output-tab.active { color: var(--c-accent); border-bottom-color: var(--c-accent); }
+.output-tab:hover { color: var(--c-text); }
+
+.tab-content { display: none; padding: 24px; }
+.tab-content.active { display: block; }
+
+.summary-text { font-size: 0.9rem; line-height: 1.8; color: var(--c-text); }
+
+.key-concept {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 100px;
+  background: rgba(124,106,247,0.1);
+  border: 1px solid rgba(124,106,247,0.2);
+  font-size: 0.8rem; color: var(--c-accent2); margin: 4px;
+  cursor: pointer; transition: all 0.2s;
+}
+.key-concept:hover { background: rgba(124,106,247,0.2); }
+
+.timestamp-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--c-border);
+  margin-bottom: 10px; transition: all 0.2s;
+  background: var(--c-bg2);
+}
+.timestamp-item:hover { border-color: var(--c-border2); }
+.timestamp-time {
+  font-family: var(--font-mono); font-size: 0.78rem;
+  color: var(--c-accent); background: rgba(124,106,247,0.1);
+  padding: 3px 8px; border-radius: 4px; white-space: nowrap;
+}
+.timestamp-text { font-size: 0.875rem; line-height: 1.5; }
+
+.quiz-card {
+  background: var(--c-bg2); border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm); padding: 20px; margin-bottom: 14px;
+}
+.quiz-q { font-weight: 600; margin-bottom: 12px; font-size: 0.9rem; }
+.quiz-opts { display: flex; flex-direction: column; gap: 8px; }
+.quiz-opt {
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--c-border2); background: none;
+  color: var(--c-text); font-size: 0.85rem; text-align: left;
+  cursor: pointer; transition: all 0.2s; font-family: var(--font-body);
+}
+.quiz-opt:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.quiz-opt.correct { border-color: var(--c-green); background: rgba(52,211,153,0.08); color: var(--c-green); }
+.quiz-opt.wrong { border-color: var(--c-red); background: rgba(255,77,109,0.08); color: var(--c-red); }
+
+.exam-section { margin-bottom: 24px; }
+.exam-h { font-family: var(--font-display); font-weight: 700; font-size: 1rem; margin-bottom: 10px; color: var(--c-accent); }
+.exam-bullet {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--c-border); font-size: 0.875rem;
+}
+.exam-bullet::before { content: '▸'; color: var(--c-accent); margin-top: 1px; flex-shrink: 0; }
+
+/* Action bar */
+.action-bar {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  background: var(--c-bg2);
+  border-top: 1px solid var(--c-border2);
+}
+.action-btn {
+  padding: 7px 14px; border-radius: var(--radius-sm);
+  background: var(--c-bg3); border: 1px solid var(--c-border2);
+  color: var(--c-text2); font-size: 0.8rem; font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+  transition: all 0.2s; cursor: pointer; font-family: var(--font-body);
+}
+.action-btn:hover { border-color: var(--c-accent); color: var(--c-accent); }
+
+/* Loader */
+.loader-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+}
+.loader-overlay.show { display: flex; }
+.loader-spinner {
+  width: 56px; height: 56px;
+  border: 3px solid var(--c-border2);
+  border-top-color: var(--c-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.loader-text { font-size: 0.95rem; color: var(--c-text2); animation: pulse 1.5s ease infinite; }
+
+/* Progress bar */
+.progress-bar-wrap {
+  width: 280px; height: 4px;
+  background: var(--c-border2); border-radius: 2px; overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--c-accent), var(--c-accent2));
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+/* Toast */
+.toast-container {
+  position: fixed; bottom: 24px; right: 24px;
+  display: flex; flex-direction: column; gap: 10px;
+  z-index: 9998;
+}
+.toast {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  background: var(--c-bg2);
+  border: 1px solid var(--c-border2);
+  border-left: 3px solid var(--c-accent);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  min-width: 280px; max-width: 380px;
+  animation: slideInRight 0.3s ease;
+  font-size: 0.875rem;
+}
+.toast.success { border-left-color: var(--c-green); }
+.toast.error { border-left-color: var(--c-red); }
+.toast.info { border-left-color: var(--c-amber); }
+.toast-icon { flex-shrink: 0; }
+.toast-body { flex: 1; }
+.toast-title { font-weight: 600; margin-bottom: 1px; }
+.toast-msg { color: var(--c-text2); font-size: 0.8rem; }
+.toast-close { color: var(--c-text3); cursor: pointer; background: none; border: none; padding: 2px; }
+.toast-close:hover { color: var(--c-text); }
+
+/* Past summaries */
+.past-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.past-card {
+  background: var(--c-bg2); border: 1px solid var(--c-border);
+  border-radius: var(--radius); padding: 20px;
+  cursor: pointer; transition: all 0.25s;
+}
+.past-card:hover { border-color: var(--c-accent); transform: translateY(-2px); box-shadow: var(--shadow); }
+.past-thumb {
+  width: 100%; height: 120px;
+  background: linear-gradient(135deg, var(--c-bg3), var(--c-bg));
+  border-radius: var(--radius-sm); margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--c-text3); font-size: 2rem;
+  overflow: hidden; position: relative;
+}
+.past-thumb-img { width: 100%; height: 100%; object-fit: cover; }
+.past-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; line-height: 1.4; }
+.past-meta { font-size: 0.78rem; color: var(--c-text3); display: flex; gap: 8px; flex-wrap: wrap; }
+.past-tag {
+  padding: 2px 8px; border-radius: 100px;
+  background: rgba(124,106,247,0.1); color: var(--c-accent2);
+  font-size: 0.72rem;
+}
+
+/* Focus mode */
+.focus-mode-overlay {
+  display: none; position: fixed; inset: 0;
+  background: var(--c-bg); z-index: 9000;
+  overflow-y: auto; padding: 40px 24px;
+}
+.focus-mode-overlay.show { display: block; }
+.focus-inner { max-width: 720px; margin: 0 auto; }
+.focus-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
+.focus-title { font-family: var(--font-display); font-size: 1.8rem; font-weight: 800; }
+.focus-close {
+  padding: 8px 16px; background: var(--c-bg2);
+  border: 1px solid var(--c-border2); border-radius: var(--radius-sm);
+  color: var(--c-text2); font-size: 0.875rem; display: flex; align-items: center; gap: 8px;
+  cursor: pointer; font-family: var(--font-body);
+}
+.focus-body { font-size: 1.1rem; line-height: 1.9; color: var(--c-text); }
+.focus-body p { margin-bottom: 1.2rem; }
+
+/* Voice TTS bar */
+.tts-bar {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 16px 24px;
+  background: var(--c-bg2);
+  border-top: 1px solid var(--c-border2);
+  z-index: 800;
+  backdrop-filter: blur(20px);
+  align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.tts-bar.show { display: flex; }
+.tts-play {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--c-accent), #9b5de5);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer; border: none; flex-shrink: 0;
+  transition: all 0.2s;
+}
+.tts-play:hover { transform: scale(1.05); }
+.tts-title { font-size: 0.85rem; color: var(--c-text2); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tts-progress { flex: 2; display: flex; align-items: center; gap: 10px; }
+.tts-slider { flex: 1; accent-color: var(--c-accent); cursor: pointer; }
+.tts-time { font-family: var(--font-mono); font-size: 0.78rem; color: var(--c-text3); }
+.tts-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--c-bg3); border: 1px solid var(--c-border2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--c-text2); cursor: pointer; flex-shrink: 0;
+}
+
+/* Search */
+.search-wrap { position: relative; margin-bottom: 24px; }
+.search-icon-pos {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--c-text3); pointer-events: none;
+  display: flex; align-items: center;
+}
+.search-input {
+  width: 100%; padding: 12px 16px 12px 42px;
+  background: var(--c-bg2); border: 1px solid var(--c-border2);
+  border-radius: var(--radius-sm); color: var(--c-text); font-size: 0.9rem;
+  outline: none; transition: all 0.2s;
+}
+.search-input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.15); }
+
+/* Contact Section */
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+@media (max-width: 768px) {
+  .contact-grid { grid-template-columns: 1fr; }
+  .steps { flex-direction: column; gap: 24px; }
+  .steps::before { display: none; }
+  .nav-links { display: none; }
+  .hamburger { display: flex; }
+  .hero-stats { gap: 20px; }
+  .hero-divider { display: none; }
+  .url-row { flex-direction: column; }
+  .dash-header { flex-direction: column; }
+  .tts-progress { display: none; }
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+.footer {
+  background: var(--c-bg2);
+  border-top: 1px solid var(--c-border);
+  padding: 60px 24px 32px;
+  position: relative; z-index: 1;
+}
+.footer-inner { max-width: 1200px; margin: 0 auto; }
+.footer-top {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px; margin-bottom: 48px;
+}
+@media (max-width: 768px) { .footer-top { grid-template-columns: 1fr 1fr; } }
+.footer-brand-desc { font-size: 0.875rem; color: var(--c-text2); margin-top: 12px; line-height: 1.7; max-width: 260px; }
+.footer-col-title { font-weight: 700; font-size: 0.875rem; margin-bottom: 16px; }
+.footer-links { display: flex; flex-direction: column; gap: 10px; }
+.footer-link { font-size: 0.85rem; color: var(--c-text2); cursor: pointer; transition: color 0.2s; }
+.footer-link:hover { color: var(--c-accent); }
+.footer-bottom {
+  border-top: 1px solid var(--c-border);
+  padding-top: 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  font-size: 0.82rem; color: var(--c-text3);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
+}
+@keyframes waveform {
+  0%, 100% { height: 4px; } 50% { height: 20px; }
+}
+
+.fade-in { animation: fadeIn 0.5s ease both; }
+.fade-up { animation: fadeInUp 0.5s ease both; }
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0; transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* Waveform viz for TTS */
+.waveform {
+  display: flex; align-items: center; gap: 3px; height: 24px;
+}
+.waveform-bar {
+  width: 3px; background: var(--c-accent); border-radius: 2px;
+  animation: waveform 0.6s ease infinite;
+}
+.waveform-bar:nth-child(2) { animation-delay: 0.1s; }
+.waveform-bar:nth-child(3) { animation-delay: 0.2s; }
+.waveform-bar:nth-child(4) { animation-delay: 0.3s; }
+.waveform-bar:nth-child(5) { animation-delay: 0.2s; }
+.waveform-bar:nth-child(6) { animation-delay: 0.1s; }
+.waveform-bar:nth-child(7) { animation-delay: 0.15s; }
+
+/* Unique feature: MINDMAP */
+.mindmap-container { position: relative; width: 100%; height: 420px; overflow: hidden; }
+.mindmap-node {
+  position: absolute; padding: 8px 16px;
+  border-radius: 100px; font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; transition: all 0.3s; white-space: nowrap;
+}
+.mindmap-node.center {
+  background: linear-gradient(135deg, var(--c-accent), #9b5de5);
+  color: #fff; font-weight: 700; font-size: 0.9rem;
+  padding: 12px 24px; box-shadow: 0 0 30px rgba(124,106,247,0.4);
+}
+.mindmap-node.branch {
+  background: var(--c-bg2); border: 1px solid var(--c-border2); color: var(--c-text2);
+}
+.mindmap-node.leaf {
+  background: rgba(124,106,247,0.08); border: 1px solid rgba(124,106,247,0.2);
+  color: var(--c-accent2); font-size: 0.75rem;
+}
+.mindmap-node:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+.mindmap-svg { position: absolute; inset: 0; pointer-events: none; }
+
+/* nav active user */
+.user-badge {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 6px;
+  background: var(--c-bg3);
+  border: 1px solid var(--c-border2);
+  border-radius: 100px;
+  cursor: pointer;
+}
+.user-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--c-accent), var(--c-red));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700; color: #fff;
+}
+.user-name { font-size: 0.82rem; font-weight: 500; }
+
+/* Mobile menu */
+.mobile-menu {
+  display: none; position: fixed;
+  top: var(--nav-h); left: 0; right: 0;
+  background: var(--c-bg2); border-bottom: 1px solid var(--c-border2);
+  padding: 16px 24px; z-index: 999;
+  flex-direction: column; gap: 4px;
+}
+.mobile-menu.show { display: flex; }
+.mobile-link {
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  font-size: 0.9rem; cursor: pointer;
+  transition: all 0.2s; color: var(--c-text2);
+}
+.mobile-link:hover { background: var(--c-glass2); color: var(--c-text); }
+
+/* ============================================
+   MISC UTILS
+   ============================================ */
+.hidden { display: none !important; }
+.text-accent { color: var(--c-accent); }
+.text-muted { color: var(--c-text2); }
+.mono { font-family: var(--font-mono); }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 100px;
+  font-size: 0.75rem; font-weight: 500;
+}
+.chip-purple { background: rgba(124,106,247,0.12); color: var(--c-accent2); border: 1px solid rgba(124,106,247,0.2); }
+.chip-red { background: rgba(255,77,109,0.1); color: var(--c-red2); border: 1px solid rgba(255,77,109,0.2); }
+.chip-green { background: rgba(52,211,153,0.1); color: var(--c-green); border: 1px solid rgba(52,211,153,0.2); }
+.chip-amber { background: rgba(251,191,36,0.1); color: var(--c-amber); border: 1px solid rgba(251,191,36,0.2); }
+.section-divider { height: 1px; background: var(--c-border); margin: 0 24px; }
+
+/* Testimonials */
+.testimonials { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+.testimonial-card {
+  background: var(--c-bg2); border: 1px solid var(--c-border);
+  border-radius: var(--radius); padding: 24px; transition: all 0.3s;
+}
+.testimonial-card:hover { border-color: var(--c-border2); transform: translateY(-2px); }
+.t-stars { color: var(--c-amber); font-size: 0.9rem; margin-bottom: 12px; }
+.t-text { font-size: 0.875rem; line-height: 1.7; color: var(--c-text2); margin-bottom: 16px; }
+.t-author { display: flex; align-items: center; gap: 10px; }
+.t-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: 700; color: #fff;
+}
+.t-name { font-weight: 600; font-size: 0.875rem; }
+.t-role { font-size: 0.78rem; color: var(--c-text3); }
+
+/* Gradient border glow */
+.glow-border {
+  position: relative;
+}
+.glow-border::after {
+  content: '';
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--c-accent), var(--c-red), var(--c-amber));
+  z-index: -1; opacity: 0.5;
+}
+
+/* ============================================
+   UNIQUE FEATURE: BRAIN DUMP / MINDMAP
+   ============================================ */
+#mindmap-page {
+  padding: calc(var(--nav-h) + 24px) 24px 60px;
+  max-width: 1100px; margin: 0 auto;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     LOADER OVERLAY
+     ============================================ -->
+<div class="loader-overlay" id="loaderOverlay">
+  <div class="loader-spinner"></div>
+  <div class="loader-text" id="loaderText">Analyzing video...</div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+</div>
+
+<!-- ============================================
+     TOAST CONTAINER
+     ============================================ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ============================================
+     FOCUS MODE OVERLAY
+     ============================================ -->
+<div class="focus-mode-overlay" id="focusMode">
+  <div class="focus-inner">
+    <div class="focus-header">
+      <div>
+        <div class="chip chip-purple" style="margin-bottom: 8px;">FOCUS MODE</div>
+        <div class="focus-title" id="focusTitle">Summary</div>
+      </div>
+      <button class="focus-close" onclick="closeFocus()">
+        <i data-lucide="x" style="width:14px;height:14px;"></i> Exit Focus
+      </button>
+    </div>
+    <div class="focus-body" id="focusBody"></div>
+  </div>
+</div>
+
+<!-- ============================================
+     TTS BAR
+     ============================================ -->
+<div class="tts-bar" id="ttsBar">
+  <button class="tts-play" id="ttsPlayBtn" onclick="toggleTTS()">
+    <i data-lucide="play" style="width:16px;height:16px;" id="ttsIcon"></i>
+  </button>
+  <div class="waveform" id="ttsWave" style="display:none;">
+    <div class="waveform-bar"></div><div class="waveform-bar"></div>
+    <div class="waveform-bar"></div><div class="waveform-bar"></div>
+    <div class="waveform-bar"></div><div class="waveform-bar"></div>
+    <div class="waveform-bar"></div>
+  </div>
+  <div class="tts-title" id="ttsTitle">Playing summary...</div>
+  <div class="tts-progress">
+    <span class="tts-time" id="ttsElapsed">0:00</span>
+    <input type="range" class="tts-slider" id="ttsSlider" value="0" min="0" max="100" oninput="seekTTS(this.value)" />
+    <span class="tts-time" id="ttsDuration">3:42</span>
+  </div>
+  <button class="tts-close" onclick="closeTTS()">
+    <i data-lucide="x" style="width:14px;height:14px;"></i>
+  </button>
+</div>
+
+<!-- ============================================
+     NAVBAR
+     ============================================ -->
+<nav class="navbar" id="navbar">
+  <div class="nav-logo" onclick="showPage('landing')">
+    <div class="nav-logo-icon">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M7 5L13 9L7 13V5Z" fill="white"/>
+      </svg>
+    </div>
+    <span>Sum<span class="yt">Tube</span><span class="ai">.ai</span></span>
+  </div>
+
+  <div class="nav-links" id="navLinks">
+    <button class="nav-link" onclick="scrollToSection('features')">Features</button>
+    <button class="nav-link" onclick="scrollToSection('how-it-works')">How It Works</button>
+    <button class="nav-link" onclick="scrollToSection('pricing')">Pricing</button>
+    <button class="nav-link" onclick="scrollToSection('contact')">Contact</button>
+  </div>
+
+  <div class="nav-actions">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+      <i data-lucide="sun" style="width:16px;height:16px;" id="themeIconSun"></i>
+      <i data-lucide="moon" style="width:16px;height:16px;" id="themeIconMoon" class="hidden"></i>
+    </button>
+    <div id="navGuest">
+      <span id="navLoginBtn" onclick="showPage('login')" style="cursor:pointer;display:inline-block;margin-right:6px;">
+        <button class="btn-ghost">Sign In</button>
+      </span>
+      <button class="btn-primary" onclick="showPage('signup')">Get Started</button>
+    </div>
+    <div id="navUser" class="hidden">
+      <div class="user-badge" onclick="showPage('dashboard')">
+        <div class="user-avatar" id="userAvatarNav">A</div>
+        <span class="user-name" id="userNameNav">User</span>
+      </div>
+      <button class="btn-ghost" style="margin-left:8px;" onclick="logout()">Logout</button>
+    </div>
+    <button class="hamburger" id="hamburger" onclick="toggleMobileMenu()">
+      <i data-lucide="menu" style="width:18px;height:18px;"></i>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile menu -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-link" onclick="scrollToSection('features');toggleMobileMenu()">Features</div>
+  <div class="mobile-link" onclick="scrollToSection('how-it-works');toggleMobileMenu()">How It Works</div>
+  <div class="mobile-link" onclick="scrollToSection('pricing');toggleMobileMenu()">Pricing</div>
+  <div class="mobile-link" onclick="scrollToSection('contact');toggleMobileMenu()">Contact</div>
+</div>
+
+<!-- ============================================
+     PAGE: LANDING
+     ============================================ -->
+<div class="page active" id="page-landing">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      AI-Powered · Real-time · Multi-language
+    </div>
+
+    <h1 class="hero-title">
+      Stop Watching.<br/>
+      <span class="grad">Start Understanding.</span>
+    </h1>
+    <p class="hero-sub">
+      Transform any YouTube video into a comprehensive AI summary, key concepts, timestamps, quizzes, and revision notes — in seconds.
+    </p>
+
+    <div class="hero-input-wrap">
+      <i data-lucide="youtube" style="width:20px;height:20px;color:var(--c-red);flex-shrink:0;margin-left:4px;margin-top:auto;margin-bottom:auto;"></i>
+      <input class="hero-input" id="heroUrl" type="text" placeholder="Paste YouTube URL here — e.g. https://youtube.com/watch?v=..." />
+      <button class="hero-cta" onclick="heroSummarize()">
+        <i data-lucide="zap" style="width:15px;height:15px;"></i>
+        Summarize
+      </button>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num">2.4M+</div>
+        <div class="hero-stat-label">Videos Summarized</div>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">98%</div>
+        <div class="hero-stat-label">Accuracy Rate</div>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">40+</div>
+        <div class="hero-stat-label">Languages Supported</div>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">&lt; 8s</div>
+        <div class="hero-stat-label">Average Summary Time</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="section-inner">
+      <div class="reveal">
+        <div class="section-label">Everything You Need</div>
+        <h2 class="section-title">Built for serious learners</h2>
+        <p class="section-desc">Every feature designed to save you time and maximize your understanding from any video content.</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- Feature Cards -->
+        <div class="feature-card reveal" style="transition-delay:0.05s">
+          <div class="feature-icon" style="background:rgba(124,106,247,0.12);">🧠</div>
+          <div class="feature-title">Smart AI Summary</div>
+          <div class="feature-desc">Advanced NLP extracts the most important insights, not just a transcript. Understand any video in under 2 minutes.</div>
+        </div>
+        <div class="feature-card reveal" style="transition-delay:0.1s">
+          <div class="feature-icon" style="background:rgba(255,77,109,0.1);">🌍</div>
+          <div class="feature-title">40+ Language Support</div>
+          <div class="feature-desc">Get summaries in your native language. Supports English, Spanish, Hindi, French, Japanese, Arabic, and 35+ more.</div>
+        </div>
+        <div class="feature-card reveal" style="transition-delay:0.15s">
+          <div class="feature-icon" style="background:rgba(52,211,153,0.1);">⏱️</div>
+          <div class="feature-title">Smart Timestamps</div>
+          <div class="feature-desc">Jump to the most important moments instantly with AI-detected key timestamps and chapter labels.</div>
+        </div>
+        <div class="feature-card reveal" style="transition-delay:0.2s">
+          <div class="feature-icon" style="background:rgba(251,191,36,0.1);">📝</div>
+          <div class="feature-title">Exam Mode</div>
+          <div class="feature-desc">Converts any educational video into revision-ready notes with definitions, key points, and memory anchors.</div>
+        </div>
+        <div class="feature-card reveal" style="transition-delay:0.25s">
+          <div class="feature-icon" style="background:rgba(167,139,250,0.12);">🎯</div>
+          <div class="feature-title">AI Quiz Generator</div>
+          <div class="feature-desc">Test your knowledge with auto-generated multiple choice quizzes based on actual video content.</div>
+        </div>
+        <div class="feature-card reveal" style="transition-delay:0.3s">
+          <div class="feature-icon" style="background:rgba(255,118,140,0.1);">🗺️</div>
+          <div class="feature-title">Mind Map View</div>
+          <div class="feature-desc">Visualize the entire video as an interactive mind map. Our unique visual learning feature no one else has.</div>
+        </div>
+        <div class="feature-card reveal" style="transition-delay:0.35s">
+          <div class="feature-icon" style="background:rgba(52,211,153,0.1);">🔊</div>
+          <div class="feature-title">Voice Playback (TTS)</div>
+          <div class="feature-desc">Listen to your summaries like a podcast with natural-sounding AI voice in your preferred language.</div>
+        </div>
+        <div class="feature-card reveal" style="transition-delay:0.4s">
+          <div class="feature-icon" style="background:rgba(251,191,36,0.1);">🎧</div>
+          <div class="feature-title">Focus Mode</div>
+          <div class="feature-desc">Distraction-free reading environment with customizable font size and ambient sound options.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- HOW IT WORKS -->
+  <section class="section" id="how-it-works">
+    <div class="section-inner">
+      <div class="reveal" style="text-align:center;margin-bottom:60px;">
+        <div class="section-label">Simple Process</div>
+        <h2 class="section-title">Three steps to enlightenment</h2>
+      </div>
+      <div class="steps reveal">
+        <div class="step">
+          <div class="step-num">01</div>
+          <div class="step-title">Paste URL</div>
+          <div class="step-desc">Drop any YouTube link — lectures, tutorials, podcasts, documentaries.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <div class="step-title">Choose Options</div>
+          <div class="step-desc">Select summary length, language, output format, and special modes.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <div class="step-title">Get Insights</div>
+          <div class="step-desc">Receive a complete summary pack — notes, timestamps, quiz, mind map.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- TESTIMONIALS -->
+  <section class="section">
+    <div class="section-inner">
+      <div class="reveal" style="text-align:center;margin-bottom:50px;">
+        <div class="section-label">Social Proof</div>
+        <h2 class="section-title">Loved by 2+ million learners</h2>
+      </div>
+      <div class="testimonials reveal">
+        <div class="testimonial-card">
+          <div class="t-stars">★★★★★</div>
+          <p class="t-text">"I used to spend 4 hours watching lecture recordings. Now I get the key insights in 10 minutes and use the quiz to check my understanding. Exam prep has never been easier."</p>
+          <div class="t-author">
+            <div class="t-avatar" style="background:linear-gradient(135deg,#7c6af7,#9b5de5);">PA</div>
+            <div><div class="t-name">Priya Anand</div><div class="t-role">Medical Student, AIIMS</div></div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="t-stars">★★★★★</div>
+          <p class="t-text">"The mind map feature is insane. I can see how all the concepts in a 90-minute talk connect to each other. This is genuinely the best productivity tool I've used this year."</p>
+          <div class="t-author">
+            <div class="t-avatar" style="background:linear-gradient(135deg,#ff4d6d,#ff758c);">MR</div>
+            <div><div class="t-name">Marcus Reid</div><div class="t-role">Product Manager, Spotify</div></div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="t-stars">★★★★★</div>
+          <p class="t-text">"I'm not a native English speaker. The multi-language summary feature lets me get summaries in Hindi for English tech talks. This has changed how I learn programming."</p>
+          <div class="t-author">
+            <div class="t-avatar" style="background:linear-gradient(135deg,#34d399,#059669);">RK</div>
+            <div><div class="t-name">Ravi Kumar</div><div class="t-role">Software Engineer, Infosys</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- PRICING -->
+  <section class="section" id="pricing">
+    <div class="section-inner">
+      <div class="reveal" style="text-align:center;margin-bottom:50px;">
+        <div class="section-label">Pricing</div>
+        <h2 class="section-title">Start free, scale as you grow</h2>
+        <p class="section-desc" style="margin: 0 auto 0;">No credit card required. Cancel anytime.</p>
+      </div>
+      <div class="pricing-grid reveal">
+        <div class="pricing-card">
+          <div class="pricing-name">Free</div>
+          <div class="pricing-price">$0<span>/mo</span></div>
+          <div class="pricing-desc">Perfect for casual learners exploring the power of AI summaries.</div>
+          <ul class="pricing-features">
+            <li><span class="check">✓</span> 10 summaries / month</li>
+            <li><span class="check">✓</span> Basic summary (short only)</li>
+            <li><span class="check">✓</span> 3 languages</li>
+            <li><span class="check">✓</span> Copy & export text</li>
+            <li style="color:var(--c-text3)">✗ Quiz generator</li>
+            <li style="color:var(--c-text3)">✗ Mind Map</li>
+            <li style="color:var(--c-text3)">✗ Voice playback</li>
+          </ul>
+          <button class="btn-ghost" style="width:100%;padding:12px;" onclick="showPage('signup')">Get Started Free</button>
+        </div>
+        <div class="pricing-card popular">
+          <div class="pricing-badge">Most Popular</div>
+          <div class="pricing-name">Pro</div>
+          <div class="pricing-price">$9<span>/mo</span></div>
+          <div class="pricing-desc">For students, researchers, and knowledge workers who learn daily.</div>
+          <ul class="pricing-features">
+            <li><span class="check">✓</span> Unlimited summaries</li>
+            <li><span class="check">✓</span> Short / Medium / Long</li>
+            <li><span class="check">✓</span> 40+ languages</li>
+            <li><span class="check">✓</span> AI Quiz Generator</li>
+            <li><span class="check">✓</span> Mind Map view</li>
+            <li><span class="check">✓</span> Voice TTS playback</li>
+            <li><span class="check">✓</span> Exam mode + PDF export</li>
+          </ul>
+          <button class="btn-primary" style="width:100%;padding:12px;" onclick="showPage('signup')">Start Pro Trial</button>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-name">Team</div>
+          <div class="pricing-price">$29<span>/mo</span></div>
+          <div class="pricing-desc">For teams, classrooms, and organizations sharing knowledge at scale.</div>
+          <ul class="pricing-features">
+            <li><span class="check">✓</span> Everything in Pro</li>
+            <li><span class="check">✓</span> Up to 10 seats</li>
+            <li><span class="check">✓</span> Shared summary library</li>
+            <li><span class="check">✓</span> Team quiz competitions</li>
+            <li><span class="check">✓</span> API access</li>
+            <li><span class="check">✓</span> Priority support</li>
+            <li><span class="check">✓</span> Custom branding</li>
+          </ul>
+          <button class="btn-ghost" style="width:100%;padding:12px;" onclick="showPage('signup')">Contact Sales</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- CONTACT -->
+  <section class="section" id="contact">
+    <div class="section-inner">
+      <div class="contact-grid">
+        <div class="reveal">
+          <div class="section-label">Get In Touch</div>
+          <h2 class="section-title" style="margin-bottom:16px;">Have questions?<br/>We'd love to help.</h2>
+          <p style="color:var(--c-text2);line-height:1.7;margin-bottom:32px;font-size:0.95rem;">Whether you're curious about pricing, need a demo, or want to integrate our API — our team is here for you.</p>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(124,106,247,0.12);display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="mail" style="width:18px;height:18px;color:var(--c-accent);"></i>
+              </div>
+              <div>
+                <div style="font-weight:600;font-size:0.875rem;">Email Us</div>
+                <div style="font-size:0.82rem;color:var(--c-text2);">hello@sumtube.ai</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,77,109,0.1);display:flex;align-items:center;justify-content:center;">
+                <i data-lucide="twitter" style="width:18px;height:18px;color:var(--c-red);"></i>
+              </div>
+              <div>
+                <div style="font-weight:600;font-size:0.875rem;">Twitter / X</div>
+                <div style="font-size:0.82rem;color:var(--c-text2);">@sumtubeai</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="reveal" style="transition-delay:0.1s;">
+          <div style="background:var(--c-bg2);border:1px solid var(--c-border2);border-radius:var(--radius);padding:28px;">
+            <div id="contactForm">
+              <div class="form-group">
+                <label class="form-label">Your Name</label>
+                <input class="form-input" id="contactName" type="text" placeholder="Ravi Kumar" />
+                <div class="form-error" id="contactNameErr">Please enter your name.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input class="form-input" id="contactEmail" type="email" placeholder="ravi@example.com" />
+                <div class="form-error" id="contactEmailErr">Please enter a valid email.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Message</label>
+                <textarea class="form-input" id="contactMsg" rows="4" placeholder="Tell us what you're thinking..." style="resize:vertical;"></textarea>
+                <div class="form-error" id="contactMsgErr">Please write a message.</div>
+              </div>
+              <button class="form-submit" onclick="submitContact()">Send Message</button>
+            </div>
+            <div id="contactSuccess" class="hidden" style="text-align:center;padding:20px 0;">
+              <div style="font-size:2rem;margin-bottom:12px;">✅</div>
+              <div style="font-weight:700;font-size:1rem;margin-bottom:6px;">Message Sent!</div>
+              <div style="color:var(--c-text2);font-size:0.875rem;">We'll get back to you within 24 hours.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="nav-logo" style="cursor:default;">
+            <div class="nav-logo-icon">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M7 5L13 9L7 13V5Z" fill="white"/>
+              </svg>
+            </div>
+            <span>Sum<span class="yt">Tube</span><span class="ai">.ai</span></span>
+          </div>
+          <p class="footer-brand-desc">The world's most powerful AI YouTube summarizer. Turn any video into actionable knowledge instantly.</p>
+        </div>
+        <div>
+          <div class="footer-col-title">Product</div>
+          <div class="footer-links">
+            <span class="footer-link" onclick="scrollToSection('features')">Features</span>
+            <span class="footer-link" onclick="scrollToSection('pricing')">Pricing</span>
+            <span class="footer-link">API</span>
+            <span class="footer-link">Chrome Extension</span>
+          </div>
+        </div>
+        <div>
+          <div class="footer-col-title">Company</div>
+          <div class="footer-links">
+            <span class="footer-link">About</span>
+            <span class="footer-link">Blog</span>
+            <span class="footer-link" onclick="scrollToSection('contact')">Contact</span>
+            <span class="footer-link">Careers</span>
+          </div>
+        </div>
+        <div>
+          <div class="footer-col-title">Legal</div>
+          <div class="footer-links">
+            <span class="footer-link">Privacy Policy</span>
+            <span class="footer-link">Terms of Service</span>
+            <span class="footer-link">Cookie Policy</span>
+            <span class="footer-link">GDPR</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 SumTube.ai. All rights reserved.</span>
+        <span>Made with ❤️ for learners worldwide</span>
+      </div>
+    </div>
+  </footer>
+
+</div><!-- /page-landing -->
+
+<!-- ============================================
+     PAGE: LOGIN
+     ============================================ -->
+<div class="page" id="page-login">
+  <div class="auth-page">
+    <div class="auth-card">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div class="nav-logo" style="justify-content:center;margin-bottom:16px;">
+          <div class="nav-logo-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M7 5L13 9L7 13V5Z" fill="white"/>
+            </svg>
+          </div>
+          <span>Sum<span class="yt">Tube</span><span class="ai">.ai</span></span>
+        </div>
+      </div>
+      <h1 class="auth-title">Welcome back</h1>
+      <p class="auth-sub">Sign in to access your summaries and dashboard.</p>
+
+      <button class="social-btn" onclick="socialLogin('Google')">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+        Continue with Google
+      </button>
+      <button class="social-btn" onclick="socialLogin('GitHub')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+        Continue with GitHub
+      </button>
+
+      <div class="auth-divider">or</div>
+
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input class="form-input" id="loginEmail" type="email" placeholder="you@example.com" />
+        <div class="form-error" id="loginEmailErr">Please enter a valid email.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;justify-content:space-between;">
+          Password
+          <span style="color:var(--c-accent);cursor:pointer;font-weight:400;">Forgot?</span>
+        </label>
+        <input class="form-input" id="loginPass" type="password" placeholder="••••••••" />
+        <div class="form-error" id="loginPassErr">Password must be at least 6 characters.</div>
+      </div>
+      <button class="form-submit" onclick="loginUser()">Sign In</button>
+      <div class="auth-switch">Don't have an account? <a onclick="showPage('signup')">Create one free →</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     PAGE: SIGNUP
+     ============================================ -->
+<div class="page" id="page-signup">
+  <div class="auth-page">
+    <div class="auth-card">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div class="nav-logo" style="justify-content:center;margin-bottom:16px;">
+          <div class="nav-logo-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M7 5L13 9L7 13V5Z" fill="white"/>
+            </svg>
+          </div>
+          <span>Sum<span class="yt">Tube</span><span class="ai">.ai</span></span>
+        </div>
+      </div>
+      <h1 class="auth-title">Create account</h1>
+      <p class="auth-sub">Join 2 million learners. It's free to start.</p>
+
+      <button class="social-btn" onclick="socialLogin('Google')">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+        Sign up with Google
+      </button>
+
+      <div class="auth-divider">or</div>
+
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input class="form-input" id="signupName" type="text" placeholder="Ravi Kumar" />
+        <div class="form-error" id="signupNameErr">Please enter your name.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input class="form-input" id="signupEmail" type="email" placeholder="you@example.com" />
+        <div class="form-error" id="signupEmailErr">Please enter a valid email.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="signupPass" type="password" placeholder="Min. 8 characters" />
+        <div class="form-error" id="signupPassErr">Password must be at least 8 characters.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm Password</label>
+        <input class="form-input" id="signupPassC" type="password" placeholder="••••••••" />
+        <div class="form-error" id="signupPassCErr">Passwords do not match.</div>
+      </div>
+      <button class="form-submit" onclick="signupUser()">Create Free Account</button>
+      <div style="font-size:0.75rem;color:var(--c-text3);text-align:center;margin-top:10px;">By signing up you agree to our Terms & Privacy Policy.</div>
+      <div class="auth-switch">Already have an account? <a onclick="showPage('login')">Sign in →</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     PAGE: DASHBOARD
+     ============================================ -->
+<div class="page" id="page-dashboard">
+  <div class="dash">
+
+    <!-- Header -->
+    <div class="dash-header">
+      <div>
+        <div class="dash-welcome" id="dashWelcome">Welcome back, User 👋</div>
+        <div class="dash-sub">Here's your knowledge dashboard — let's learn something today.</div>
+      </div>
+      <div class="dash-actions">
+        <button class="btn-ghost" onclick="showPage('history')" style="display:flex;align-items:center;gap:6px;">
+          <i data-lucide="history" style="width:14px;height:14px;"></i> History
+        </button>
+        <button class="btn-primary" onclick="document.getElementById('urlInput').focus()" style="display:flex;align-items:center;gap:6px;">
+          <i data-lucide="plus" style="width:14px;height:14px;"></i> New Summary
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Summaries This Month</div>
+        <div class="stat-value" id="statCount">0</div>
+        <div class="stat-change up">+3 this week</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Hours Saved</div>
+        <div class="stat-value" id="statHours">0</div>
+        <div class="stat-change up">↑ 4.2h vs last month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Quizzes Taken</div>
+        <div class="stat-value" id="statQuizzes">0</div>
+        <div class="stat-change up">3 this week</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Plan</div>
+        <div class="stat-value" style="font-size:1.2rem;color:var(--c-accent);">Pro</div>
+        <div class="stat-change" style="color:var(--c-text3);">Unlimited summaries</div>
+      </div>
+    </div>
+
+    <!-- Summarizer -->
+    <div class="summarizer-box">
+      <div class="summarizer-title">
+        <i data-lucide="youtube" style="width:20px;height:20px;color:var(--c-red);"></i>
+        Summarize a Video
+        <span class="chip chip-purple" style="font-size:0.7rem;margin-left:4px;">AI Powered</span>
+      </div>
+
+      <!-- URL Input -->
+      <div class="url-row">
+        <input class="url-input" id="urlInput" type="text" placeholder="Paste YouTube URL — e.g. https://youtube.com/watch?v=dQw4w9WgXcQ" />
+        <button class="btn-primary" onclick="summarizeVideo()" style="white-space:nowrap;display:flex;align-items:center;gap:8px;">
+          <i data-lucide="zap" style="width:15px;height:15px;"></i>
+          Summarize
+        </button>
+      </div>
+
+      <!-- Options -->
+      <div class="options-row">
+        <select class="select-styled" id="summaryLen">
+          <option value="short">📏 Short (150 words)</option>
+          <option value="medium" selected>📄 Medium (300 words)</option>
+          <option value="long">📚 Long (600 words)</option>
+        </select>
+        <select class="select-styled" id="summaryLang">
+          <option value="en">🇺🇸 English</option>
+          <option value="hi">🇮🇳 Hindi</option>
+          <option value="es">🇪🇸 Spanish</option>
+          <option value="fr">🇫🇷 French</option>
+          <option value="de">🇩🇪 German</option>
+          <option value="ja">🇯🇵 Japanese</option>
+          <option value="ar">🇸🇦 Arabic</option>
+          <option value="zh">🇨🇳 Chinese</option>
+          <option value="pt">🇧🇷 Portuguese</option>
+          <option value="ru">🇷🇺 Russian</option>
+        </select>
+        <select class="select-styled" id="outputMode">
+          <option value="standard">📝 Standard Summary</option>
+          <option value="exam">🎓 Exam Mode</option>
+          <option value="bullets">• Bullet Points</option>
+          <option value="mindmap">🗺️ Mind Map</option>
+        </select>
+      </div>
+
+      <!-- Toggles -->
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="tog-timestamps" onclick="toggleOption(this,'timestamps')">⏱ Timestamps</button>
+        <button class="toggle-btn active" id="tog-concepts" onclick="toggleOption(this,'concepts')">💡 Key Concepts</button>
+        <button class="toggle-btn active" id="tog-quiz" onclick="toggleOption(this,'quiz')">🧩 Quiz</button>
+        <button class="toggle-btn" id="tog-voice" onclick="toggleOption(this,'voice')">🔊 Voice</button>
+        <button class="toggle-btn" id="tog-focus" onclick="toggleOption(this,'focus')">🎧 Focus Mode</button>
+        <button class="toggle-btn" id="tog-mindmap" onclick="toggleOption(this,'mindmap')">🗺 Mind Map</button>
+      </div>
+
+      <!-- Summary Output -->
+      <div class="summary-output" id="summaryOutput">
+        <!-- Tabs -->
+        <div class="output-tabs">
+          <button class="output-tab active" onclick="switchTab('summary',this)">Summary</button>
+          <button class="output-tab" onclick="switchTab('concepts',this)">Key Concepts</button>
+          <button class="output-tab" onclick="switchTab('timestamps',this)">Timestamps</button>
+          <button class="output-tab" onclick="switchTab('quiz',this)">Quiz</button>
+          <button class="output-tab" onclick="switchTab('exam',this)">Exam Notes</button>
+          <button class="output-tab" onclick="switchTab('mindmap',this)">Mind Map</button>
+          <button class="output-tab" onclick="switchTab('notes',this)">Auto Notes</button>
+        </div>
+
+        <!-- Tab: Summary -->
+        <div class="tab-content active" id="tab-summary">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+            <div class="chip chip-red"><i data-lucide="youtube" style="width:12px;height:12px;"></i> <span id="vidTitle">Loading...</span></div>
+            <div class="chip chip-amber" id="vidDuration">—</div>
+            <div class="chip chip-purple" id="vidLang">English</div>
+          </div>
+          <div class="summary-text" id="summaryTextContent"></div>
+        </div>
+
+        <!-- Tab: Key Concepts -->
+        <div class="tab-content" id="tab-concepts">
+          <p style="font-size:0.82rem;color:var(--c-text2);margin-bottom:16px;">Click any concept to get a deep explanation.</p>
+          <div id="conceptsContent"></div>
+        </div>
+
+        <!-- Tab: Timestamps -->
+        <div class="tab-content" id="tab-timestamps">
+          <p style="font-size:0.82rem;color:var(--c-text2);margin-bottom:16px;">Key moments detected in the video:</p>
+          <div id="timestampsContent"></div>
+        </div>
+
+        <!-- Tab: Quiz -->
+        <div class="tab-content" id="tab-quiz">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-weight:700;margin-bottom:2px;">AI-Generated Quiz</div>
+              <div style="font-size:0.8rem;color:var(--c-text2);">Test your understanding of the video</div>
+            </div>
+            <div id="quizScore" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--c-accent);"></div>
+          </div>
+          <div id="quizContent"></div>
+          <button class="btn-ghost" onclick="resetQuiz()" style="margin-top:12px;display:flex;align-items:center;gap:6px;">
+            <i data-lucide="refresh-cw" style="width:13px;height:13px;"></i> Retry Quiz
+          </button>
+        </div>
+
+        <!-- Tab: Exam Notes -->
+        <div class="tab-content" id="tab-exam">
+          <div class="chip chip-purple" style="margin-bottom:16px;">🎓 Exam-Ready Revision Notes</div>
+          <div id="examContent"></div>
+        </div>
+
+        <!-- Tab: Mind Map -->
+        <div class="tab-content" id="tab-mindmap">
+          <div style="font-size:0.82rem;color:var(--c-text2);margin-bottom:12px;">Interactive visual concept map — drag to explore.</div>
+          <div class="mindmap-container" id="mindmapContainer">
+            <svg class="mindmap-svg" id="mindmapSvg"></svg>
+          </div>
+        </div>
+
+        <!-- Tab: Auto Notes -->
+        <div class="tab-content" id="tab-notes">
+          <div style="font-size:0.82rem;color:var(--c-text2);margin-bottom:16px;">Copy-ready notes for your study sessions:</div>
+          <div id="notesContent" style="font-family:var(--font-mono);font-size:0.82rem;line-height:1.8;white-space:pre-wrap;background:var(--c-bg2);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:16px;color:var(--c-text);"></div>
+        </div>
+
+        <!-- Action bar -->
+        <div class="action-bar">
+          <button class="action-btn" onclick="copyContent()"><i data-lucide="copy" style="width:13px;height:13px;"></i> Copy</button>
+          <button class="action-btn" onclick="downloadPDF()"><i data-lucide="download" style="width:13px;height:13px;"></i> PDF</button>
+          <button class="action-btn" onclick="openFocusMode()"><i data-lucide="maximize-2" style="width:13px;height:13px;"></i> Focus</button>
+          <button class="action-btn" onclick="startTTS()"><i data-lucide="volume-2" style="width:13px;height:13px;"></i> Listen</button>
+          <button class="action-btn" onclick="shareContent()"><i data-lucide="share-2" style="width:13px;height:13px;"></i> Share</button>
+          <button class="action-btn" onclick="saveSummary()"><i data-lucide="bookmark" style="width:13px;height:13px;"></i> Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Summaries -->
+    <div style="margin-bottom:24px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-family:var(--font-display);font-size:1rem;font-weight:700;">Recent Summaries</div>
+        <button class="btn-ghost" onclick="showPage('history')" style="font-size:0.8rem;display:flex;align-items:center;gap:4px;">
+          View All <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+        </button>
+      </div>
+      <div class="past-list" id="recentSummaries">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+  </div><!-- /dash -->
+</div><!-- /page-dashboard -->
+
+<!-- ============================================
+     PAGE: HISTORY
+     ============================================ -->
+<div class="page" id="page-history">
+  <div class="dash">
+    <div class="dash-header">
+      <div>
+        <div class="dash-welcome">Summary History</div>
+        <div class="dash-sub">All your past summaries in one place</div>
+      </div>
+      <button class="btn-primary" onclick="showPage('dashboard')">
+        <i data-lucide="plus" style="width:14px;height:14px;"></i> New Summary
+      </button>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search-icon-pos"><i data-lucide="search" style="width:16px;height:16px;"></i></div>
+      <input class="search-input" type="text" placeholder="Search past summaries by title, topic, or keyword..." oninput="filterHistory(this.value)" />
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;">
+      <button class="toggle-btn active" onclick="filterByType('all',this)">All</button>
+      <button class="toggle-btn" onclick="filterByType('lecture',this)">Lectures</button>
+      <button class="toggle-btn" onclick="filterByType('tech',this)">Tech</button>
+      <button class="toggle-btn" onclick="filterByType('news',this)">News</button>
+      <button class="toggle-btn" onclick="filterByType('podcast',this)">Podcasts</button>
+    </div>
+
+    <div class="past-list" id="historyList"></div>
+  </div>
+</div>
+
+<!-- ============================================
+     JAVASCRIPT
+     ============================================ -->
+<script>
+// ============================================
+// STATE & DATA
+// ============================================
+const APP = {
+  loggedIn: false,
+  user: null,
+  currentSummary: null,
+  summaries: [],
+  activeToggles: { timestamps: true, concepts: true, quiz: true, voice: false, focus: false, mindmap: false },
+  quizAnswers: {},
+  ttsPlaying: false,
+  ttsInterval: null,
+  ttsProgress: 0
+};
+
+// Sample past summaries data
+const SAMPLE_SUMMARIES = [
+  { id: 1, title: "The Future of AI: Sam Altman at TED 2024", duration: "38:22", lang: "English", type: "tech", date: "2 days ago", thumbnail: "🤖", summary: "Sam Altman discusses the trajectory of artificial general intelligence, the importance of safety research, and OpenAI's vision for transformative AI that benefits humanity. He addresses concerns about job displacement, the timeline for AGI, and how society should prepare for fundamental changes." },
+  { id: 2, title: "Deep Learning Fundamentals — Stanford CS231n", duration: "1:12:04", lang: "English", type: "lecture", date: "5 days ago", thumbnail: "🎓", summary: "This lecture covers the mathematical foundations of neural networks, backpropagation, gradient descent optimization, and the intuition behind convolutional neural networks for image recognition tasks." },
+  { id: 3, title: "India's Economic Growth Story — CNBC Analysis", duration: "24:10", lang: "Hindi", type: "news", date: "1 week ago", thumbnail: "📊", summary: "An in-depth analysis of India's GDP growth trajectory, the role of digital payments, startup ecosystem growth, and challenges around infrastructure and employment generation." },
+  { id: 4, title: "Lex Fridman interviews Elon Musk", duration: "3:41:09", lang: "English", type: "podcast", date: "2 weeks ago", thumbnail: "🎙️", summary: "Wide-ranging conversation covering SpaceX's Mars colonization plans, Tesla's full self-driving roadmap, X (Twitter) platform evolution, Neuralink brain-computer interface progress, and Musk's philosophical views on consciousness." }
+];
+
+// ============================================
+// THEME SYSTEM
+// ============================================
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeIconSun').classList.toggle('hidden', !isDark);
+  document.getElementById('themeIconMoon').classList.toggle('hidden', isDark);
+  showToast('success', isDark ? 'Light mode on' : 'Dark mode on', 'Theme updated');
+}
+
+// ============================================
+// PAGE ROUTING
+// ============================================
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('page-' + page);
+  if (target) {
+    target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  // Special handling
+  if (page === 'dashboard') {
+    if (!APP.loggedIn) { showPage('login'); return; }
+    updateDashboard();
+  }
+  if (page === 'history') {
+    if (!APP.loggedIn) { showPage('login'); return; }
+    renderHistory(SAMPLE_SUMMARIES);
+  }
+  // Re-initialize lucide icons after page switch
+  setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
+}
+
+// ============================================
+// MOBILE MENU
+// ============================================
+function toggleMobileMenu() {
+  document.getElementById('mobileMenu').classList.toggle('show');
+}
+
+// ============================================
+// SCROLL HELPER
+// ============================================
+function scrollToSection(id) {
+  showPage('landing');
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ============================================
+// AUTH SYSTEM
+// ============================================
+function loginUser() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  let valid = true;
+
+  // Reset errors
+  ['loginEmail','loginPass'].forEach(id => {
+    document.getElementById(id).classList.remove('error');
+  });
+  ['loginEmailErr','loginPassErr'].forEach(id => {
+    document.getElementById(id).classList.remove('show');
+  });
+
+  if (!email || !/\S+@\S+\.\S+/.test(email)) {
+    document.getElementById('loginEmail').classList.add('error');
+    document.getElementById('loginEmailErr').classList.add('show');
+    valid = false;
+  }
+  if (pass.length < 6) {
+    document.getElementById('loginPass').classList.add('error');
+    document.getElementById('loginPassErr').classList.add('show');
+    valid = false;
+  }
+  if (!valid) return;
+
+  showLoader('Signing you in...');
+  setTimeout(() => {
+    hideLoader();
+    setLoggedIn({ name: email.split('@')[0], email });
+    showToast('success', 'Welcome back!', 'You have successfully signed in.');
+    showPage('dashboard');
+  }, 1500);
+}
+
+function signupUser() {
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  const pass = document.getElementById('signupPass').value;
+  const passC = document.getElementById('signupPassC').value;
+  let valid = true;
+
+  ['signupName','signupEmail','signupPass','signupPassC'].forEach(id => {
+    document.getElementById(id).classList.remove('error');
+  });
+  ['signupNameErr','signupEmailErr','signupPassErr','signupPassCErr'].forEach(id => {
+    document.getElementById(id).classList.remove('show');
+  });
+
+  if (!name) { setErr('signupName','signupNameErr'); valid = false; }
+  if (!email || !/\S+@\S+\.\S+/.test(email)) { setErr('signupEmail','signupEmailErr'); valid = false; }
+  if (pass.length < 8) { setErr('signupPass','signupPassErr'); valid = false; }
+  if (pass !== passC) { setErr('signupPassC','signupPassCErr'); valid = false; }
+  if (!valid) return;
+
+  showLoader('Creating your account...');
+  setTimeout(() => {
+    hideLoader();
+    setLoggedIn({ name, email });
+    showToast('success', 'Account created!', `Welcome to SumTube, ${name}!`);
+    showPage('dashboard');
+  }, 2000);
+}
+
+function setErr(inputId, errId) {
+  document.getElementById(inputId).classList.add('error');
+  document.getElementById(errId).classList.add('show');
+}
+
+function setLoggedIn(user) {
+  APP.loggedIn = true;
+  APP.user = user;
+  const initials = user.name.slice(0,2).toUpperCase();
+  document.getElementById('navGuest').classList.add('hidden');
+  document.getElementById('navUser').classList.remove('hidden');
+  document.getElementById('userAvatarNav').textContent = initials;
+  document.getElementById('userNameNav').textContent = user.name;
+}
+
+function logout() {
+  APP.loggedIn = false;
+  APP.user = null;
+  document.getElementById('navGuest').classList.remove('hidden');
+  document.getElementById('navUser').classList.add('hidden');
+  showToast('info', 'Signed out', 'See you next time!');
+  showPage('landing');
+}
+
+function socialLogin(provider) {
+  showLoader(`Connecting with ${provider}...`);
+  setTimeout(() => {
+    hideLoader();
+    const fakeName = provider === 'Google' ? 'Alex Johnson' : 'Dev User';
+    setLoggedIn({ name: fakeName, email: `user@${provider.toLowerCase()}.com` });
+    showToast('success', `Signed in with ${provider}`, 'Welcome to SumTube!');
+    showPage('dashboard');
+  }, 1800);
+}
+
+// ============================================
+// DASHBOARD
+// ============================================
+function updateDashboard() {
+  if (!APP.user) return;
+  const name = APP.user.name;
+  document.getElementById('dashWelcome').textContent = `Welcome back, ${name} 👋`;
+  document.getElementById('statCount').textContent = APP.summaries.length + 7;
+  document.getElementById('statHours').textContent = ((APP.summaries.length + 7) * 0.6).toFixed(1);
+  document.getElementById('statQuizzes').textContent = APP.summaries.length + 3;
+  renderRecentSummaries();
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderRecentSummaries() {
+  const container = document.getElementById('recentSummaries');
+  const items = [...SAMPLE_SUMMARIES].slice(0,3);
+  container.innerHTML = items.map(s => buildPastCard(s)).join('');
+  if (window.lucide) setTimeout(() => lucide.createIcons(), 50);
+}
+
+function buildPastCard(s) {
+  return `
+    <div class="past-card" onclick="loadPastSummary(${s.id})">
+      <div class="past-thumb">${s.thumbnail}</div>
+      <div class="past-title">${s.title}</div>
+      <div class="past-meta">
+        <span>⏱ ${s.duration}</span>
+        <span class="past-tag">${s.type}</span>
+        <span>${s.date}</span>
+      </div>
+    </div>
+  `;
+}
+
+function loadPastSummary(id) {
+  const s = SAMPLE_SUMMARIES.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('urlInput').value = `https://youtube.com/watch?v=example_${id}`;
+  simulateSummary(s);
+  window.scrollTo({ top: document.querySelector('.summarizer-box').offsetTop - 80, behavior: 'smooth' });
+}
+
+// ============================================
+// HERO SUMMARIZE (UNAUTHENTICATED PREVIEW)
+// ============================================
+function heroSummarize() {
+  const url = document.getElementById('heroUrl').value.trim();
+  if (!url) {
+    showToast('error', 'No URL entered', 'Please paste a YouTube URL first.');
+    document.getElementById('heroUrl').focus();
+    return;
+  }
+  if (!APP.loggedIn) {
+    showToast('info', 'Sign in required', 'Create a free account to get your summary!');
+    showPage('signup');
+    return;
+  }
+  showPage('dashboard');
+  setTimeout(() => {
+    document.getElementById('urlInput').value = url;
+    summarizeVideo();
+  }, 300);
+}
+
+// ============================================
+// CORE SUMMARIZE FLOW
+// ============================================
+const VIDEO_DATA = {
+  titles: [
+    "The Complete Guide to Machine Learning",
+    "How GPT-4 Actually Works — Explained Visually",
+    "Building a Startup From Zero: Lessons from Y Combinator",
+    "Neuroscience of Learning: How Memory Really Works",
+    "React 19 — Every New Feature Explained"
+  ],
+  durations: ["28:34","1:04:22","47:11","52:30","31:55"],
+  summaries: {
+    medium: `This video provides a comprehensive exploration of the subject matter, covering foundational principles and advanced applications relevant to modern practitioners. The presenter begins by establishing core concepts with clear visual examples, then transitions into practical demonstrations that illustrate real-world use cases.
+
+Key insights include the importance of systematic thinking when approaching complex problems, the role of iterative testing in achieving optimal outcomes, and several counterintuitive findings that challenge conventional wisdom in the field.
+
+The latter portion addresses common misconceptions, providing data-driven corrections backed by peer-reviewed research. The presenter concludes with actionable recommendations and resources for further study, emphasizing that consistent practice and community engagement are the most reliable predictors of mastery.
+
+Overall, this is an excellent resource for intermediate learners looking to bridge the gap between theoretical understanding and applied expertise.`,
+    short: `A focused overview of the core principles, covering key concepts, practical applications, and actionable takeaways. The presenter distills complex ideas into digestible insights with clear real-world examples. Highly recommended for time-constrained learners who want the essential knowledge.`,
+    long: `This in-depth video covers an extensive range of topics across multiple domains of expertise. The presentation opens with a historical context that frames current challenges, then systematically builds toward sophisticated solutions through layered explanation.
+
+Chapter 1 establishes the foundational vocabulary and conceptual framework necessary for understanding subsequent material. The presenter uses analogies drawn from physics, biology, and economics to make abstract ideas concrete.
+
+Chapter 2 dives into technical implementation details, walking through multiple case studies with annotated examples. Each example is chosen to highlight a specific nuance that would be easy to miss in self-directed study.
+
+Chapter 3 addresses the cutting edge of current research, discussing open problems that practitioners are actively working to solve. Several breakthrough papers from 2023-2024 are referenced with accessible summaries.
+
+Chapter 4 provides a practical toolkit — specific frameworks, libraries, and mental models that experienced practitioners use daily. The presenter is candid about trade-offs and the limitations of each approach.
+
+The conclusion synthesizes all threads into a coherent worldview, offering a vision of where the field is heading and how learners can position themselves for the opportunities ahead.`
+  },
+  concepts: ["Gradient Descent","Neural Networks","Backpropagation","Loss Functions","Regularization","Attention Mechanism","Transformer Architecture","Transfer Learning","Overfitting","Hyperparameter Tuning","Batch Normalization","Dropout","Cross-Entropy","Embeddings","Fine-tuning"],
+  timestamps: [
+    {time:"0:00", text:"Introduction & agenda overview"},
+    {time:"3:42", text:"Core concept explained with visual demonstration"},
+    {time:"11:18", text:"Practical examples and code walkthrough"},
+    {time:"22:05", text:"Common pitfalls and how to avoid them"},
+    {time:"31:47", text:"Advanced techniques for power users"},
+    {time:"41:00", text:"Real-world case studies and benchmarks"},
+    {time:"52:30", text:"Q&A and future directions"},
+  ],
+  quiz: [
+    {
+      q: "What is the primary purpose of the backpropagation algorithm in neural networks?",
+      opts: ["Forward pass through layers","Calculate gradients for weight updates","Initialize model parameters","Normalize input data"],
+      ans: 1
+    },
+    {
+      q: "Which optimization technique helps prevent overfitting by randomly dropping neurons during training?",
+      opts: ["Batch Normalization","L2 Regularization","Dropout","Weight Decay"],
+      ans: 2
+    },
+    {
+      q: "What architectural innovation enabled transformers to process sequences in parallel rather than sequentially?",
+      opts: ["Recurrent connections","Self-attention mechanism","Convolutional filters","Pooling layers"],
+      ans: 1
+    },
+    {
+      q: "Transfer learning is most beneficial when:",
+      opts: ["You have unlimited training data","Your dataset is small and related to a pre-trained model's domain","You're building a model from scratch","The target task is completely unlike the source task"],
+      ans: 1
+    }
+  ],
+  mindmapNodes: ["Optimization","Architectures","Training","Evaluation","Deployment","Data Pipeline","Research"],
+  mindmapLeaves: {
+    "Optimization": ["Adam","SGD","Learning Rate"],
+    "Architectures": ["Transformer","CNN","RNN"],
+    "Training": ["Backprop","Batch Norm","Dropout"],
+    "Evaluation": ["Accuracy","F1 Score","AUC-ROC"],
+    "Deployment": ["Quantization","ONNX","APIs"],
+    "Data Pipeline": ["Augmentation","Tokenization","Embedding"],
+    "Research": ["Papers","Benchmarks","Reproducibility"]
+  }
+};
+
+function summarizeVideo() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) {
+    showToast('error', 'No URL entered', 'Please paste a valid YouTube URL.');
+    document.getElementById('urlInput').focus();
+    return;
+  }
+  if (!url.includes('youtube') && !url.includes('youtu.be')) {
+    showToast('error', 'Invalid URL', 'Please paste a valid YouTube video URL.');
+    return;
+  }
+
+  showLoader('Fetching video transcript...');
+  const steps = [
+    { text: 'Fetching video transcript...', progress: 20 },
+    { text: 'Analyzing content with AI...', progress: 45 },
+    { text: 'Extracting key concepts...', progress: 65 },
+    { text: 'Generating timestamps...', progress: 80 },
+    { text: 'Building quiz questions...', progress: 92 },
+    { text: 'Finalizing summary pack...', progress: 100 }
+  ];
+
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < steps.length) {
+      document.getElementById('loaderText').textContent = steps[i].text;
+      document.getElementById('progressFill').style.width = steps[i].progress + '%';
+      i++;
+    } else {
+      clearInterval(interval);
+      hideLoader();
+      const randomTitle = VIDEO_DATA.titles[Math.floor(Math.random() * VIDEO_DATA.titles.length)];
+      const randomDur = VIDEO_DATA.durations[Math.floor(Math.random() * VIDEO_DATA.durations.length)];
+      simulateSummary({ title: randomTitle, duration: randomDur });
+    }
+  }, 500);
+}
+
+function simulateSummary(overrides = {}) {
+  const len = document.getElementById('summaryLen')?.value || 'medium';
+  const lang = document.getElementById('summaryLang');
+  const langText = lang ? lang.options[lang.selectedIndex].text : 'English';
+
+  const title = overrides.title || VIDEO_DATA.titles[0];
+  const duration = overrides.duration || '28:34';
+  const summaryText = overrides.summary || VIDEO_DATA.summaries[len] || VIDEO_DATA.summaries.medium;
+
+  // Set header chips
+  document.getElementById('vidTitle').textContent = title.length > 40 ? title.slice(0,40)+'…' : title;
+  document.getElementById('vidDuration').textContent = '⏱ ' + duration;
+  document.getElementById('vidLang').textContent = langText.replace(/[🇺🇸🇮🇳🇪🇸🇫🇷🇩🇪🇯🇵🇸🇦🇨🇳🇧🇷🇷🇺]/gu,'').trim();
+
+  // Summary text
+  document.getElementById('summaryTextContent').textContent = summaryText;
+
+  // Key concepts
+  const concepts = VIDEO_DATA.concepts.slice(0, 10);
+  document.getElementById('conceptsContent').innerHTML = concepts.map(c =>
+    `<span class="key-concept" onclick="explainConcept('${c}')">${c}</span>`
+  ).join('');
+
+  // Timestamps
+  document.getElementById('timestampsContent').innerHTML = VIDEO_DATA.timestamps.map(t => `
+    <div class="timestamp-item">
+      <span class="timestamp-time">${t.time}</span>
+      <span class="timestamp-text">${t.text}</span>
+    </div>
+  `).join('');
+
+  // Quiz
+  APP.quizAnswers = {};
+  renderQuiz();
+
+  // Exam notes
+  document.getElementById('examContent').innerHTML = `
+    <div class="exam-section">
+      <div class="exam-h">📌 Core Definitions</div>
+      <div class="exam-bullet">Gradient Descent: An optimization algorithm that iteratively adjusts model parameters to minimize the loss function by moving in the direction of steepest descent.</div>
+      <div class="exam-bullet">Backpropagation: The algorithm that calculates gradients of the loss with respect to each parameter by applying the chain rule of calculus backwards through the network.</div>
+      <div class="exam-bullet">Overfitting: When a model learns the training data too well, capturing noise rather than signal, leading to poor generalization on unseen data.</div>
+    </div>
+    <div class="exam-section">
+      <div class="exam-h">🔑 Key Points to Remember</div>
+      <div class="exam-bullet">The learning rate is the single most important hyperparameter — too high causes divergence, too low causes slow convergence.</div>
+      <div class="exam-bullet">Dropout randomly zeroes neurons during training, acting as an implicit ensemble of many smaller networks.</div>
+      <div class="exam-bullet">Transformer models use self-attention to weigh the importance of different input tokens relative to each other.</div>
+      <div class="exam-bullet">Transfer learning works because lower layers of neural networks learn universal features (edges, textures) applicable across domains.</div>
+    </div>
+    <div class="exam-section">
+      <div class="exam-h">⚡ Quick Recall Formulas</div>
+      <div class="exam-bullet">Cross-entropy loss = -Σ y·log(p) | Adam update = m/(√v + ε) | F1 = 2·(P·R)/(P+R)</div>
+    </div>
+    <div class="exam-section">
+      <div class="exam-h">🎯 Likely Exam Questions</div>
+      <div class="exam-bullet">Explain the vanishing gradient problem and two methods to mitigate it.</div>
+      <div class="exam-bullet">Compare L1 vs L2 regularization — when would you prefer each?</div>
+      <div class="exam-bullet">Describe the attention mechanism and explain why it's more powerful than RNNs for long sequences.</div>
+    </div>
+  `;
+
+  // Auto notes
+  document.getElementById('notesContent').textContent = `# ${title}\n📅 Summarized: ${new Date().toLocaleDateString()}\n⏱ Duration: ${duration}\n\n## Summary\n${summaryText}\n\n## Key Concepts\n${concepts.join(' • ')}\n\n## Important Timestamps\n${VIDEO_DATA.timestamps.map(t=>`[${t.time}] ${t.text}`).join('\n')}\n\n## Study Notes\n- Review gradient descent variants (SGD, Adam, RMSprop)\n- Understand attention mechanism mathematically\n- Practice implementing backpropagation from scratch\n- Study transformer architecture (encoder-decoder)\n\n---\nGenerated by SumTube.ai`;
+
+  // Mind map
+  renderMindMap(title);
+
+  // Show output
+  document.getElementById('summaryOutput').classList.add('show');
+  switchTab('summary', document.querySelector('.output-tab'));
+
+  // Save to history
+  APP.summaries.push({ id: Date.now(), title, duration, date: 'Just now', type: 'tech', thumbnail: '🎬', summary: summaryText });
+  APP.currentSummary = { title, duration, summaryText };
+
+  // Update stats
+  document.getElementById('statCount').textContent = APP.summaries.length + 7;
+
+  showToast('success', 'Summary Ready!', `${title.slice(0,30)}... summarized successfully.`);
+  setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 100);
+}
+
+// ============================================
+// QUIZ
+// ============================================
+function renderQuiz() {
+  const container = document.getElementById('quizContent');
+  container.innerHTML = VIDEO_DATA.quiz.map((q, qi) => `
+    <div class="quiz-card" id="quizCard-${qi}">
+      <div class="quiz-q">Q${qi+1}. ${q.q}</div>
+      <div class="quiz-opts">
+        ${q.opts.map((opt, oi) => `
+          <button class="quiz-opt" id="quizOpt-${qi}-${oi}" onclick="answerQuiz(${qi},${oi},${q.ans})">${String.fromCharCode(65+oi)}. ${opt}</button>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('quizScore').textContent = '';
+}
+
+function answerQuiz(qi, selected, correct) {
+  if (APP.quizAnswers[qi] !== undefined) return;
+  APP.quizAnswers[qi] = selected;
+
+  const correctBtn = document.getElementById(`quizOpt-${qi}-${correct}`);
+  const selectedBtn = document.getElementById(`quizOpt-${qi}-${selected}`);
+  // Disable all options in this question
+  for (let i = 0; i < 4; i++) {
+    const b = document.getElementById(`quizOpt-${qi}-${i}`);
+    if (b) b.disabled = true;
+  }
+  correctBtn.classList.add('correct');
+  if (selected !== correct) selectedBtn.classList.add('wrong');
+
+  // Update score
+  const answered = Object.keys(APP.quizAnswers).length;
+  const correct_count = Object.entries(APP.quizAnswers).filter(([k,v]) => v === VIDEO_DATA.quiz[k].ans).length;
+  if (answered === VIDEO_DATA.quiz.length) {
+    document.getElementById('quizScore').textContent = `Score: ${correct_count}/${VIDEO_DATA.quiz.length}`;
+    showToast(correct_count >= 3 ? 'success' : 'info', `Quiz complete! ${correct_count}/${VIDEO_DATA.quiz.length}`, correct_count >= 3 ? 'Great job! 🎉' : 'Review the summary and try again.');
+  }
+}
+
+function resetQuiz() {
+  APP.quizAnswers = {};
+  renderQuiz();
+}
+
+// ============================================
+// MIND MAP
+// ============================================
+function renderMindMap(videoTitle) {
+  const container = document.getElementById('mindmapContainer');
+  const svg = document.getElementById('mindmapSvg');
+  const W = container.offsetWidth || 600;
+  const H = 420;
+  const cx = W / 2, cy = H / 2;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
+
+  const branches = VIDEO_DATA.mindmapNodes;
+  const lines = [];
+
+  // Draw connection lines first
+  branches.forEach((b, i) => {
+    const angle = (i / branches.length) * Math.PI * 2 - Math.PI / 2;
+    const bx = cx + Math.cos(angle) * 155;
+    const by = cy + Math.sin(angle) * 120;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+    line.setAttribute('x2', bx); line.setAttribute('y2', by);
+    line.setAttribute('stroke', 'rgba(124,106,247,0.25)');
+    line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(line);
+  });
+
+  // Remove old nodes
+  container.querySelectorAll('.mindmap-node').forEach(n => n.remove());
+
+  // Center node
+  const center = document.createElement('div');
+  center.className = 'mindmap-node center';
+  center.textContent = (videoTitle || 'Video Topic').split(':')[0].slice(0,20);
+  center.style.cssText = `left:${cx}px;top:${cy}px;transform:translate(-50%,-50%);`;
+  container.appendChild(center);
+
+  // Branch nodes
+  branches.forEach((b, i) => {
+    const angle = (i / branches.length) * Math.PI * 2 - Math.PI / 2;
+    const bx = cx + Math.cos(angle) * 155;
+    const by = cy + Math.sin(angle) * 120;
+
+    const node = document.createElement('div');
+    node.className = 'mindmap-node branch';
+    node.textContent = b;
+    node.style.cssText = `left:${bx}px;top:${by}px;transform:translate(-50%,-50%);`;
+    node.onclick = () => showToast('info', b, (VIDEO_DATA.mindmapLeaves[b] || []).join(' · '));
+    container.appendChild(node);
+
+    // Leaves
+    const leaves = VIDEO_DATA.mindmapLeaves[b] || [];
+    leaves.forEach((leaf, li) => {
+      const leafAngle = angle + (li - (leaves.length-1)/2) * 0.35;
+      const lx = bx + Math.cos(leafAngle) * 80;
+      const ly = by + Math.sin(leafAngle) * 55;
+
+      const leafLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+      leafLine.setAttribute('x1', bx); leafLine.setAttribute('y1', by);
+      leafLine.setAttribute('x2', lx); leafLine.setAttribute('y2', ly);
+      leafLine.setAttribute('stroke', 'rgba(124,106,247,0.12)');
+      leafLine.setAttribute('stroke-width', '1');
+      svg.appendChild(leafLine);
+
+      const leafNode = document.createElement('div');
+      leafNode.className = 'mindmap-node leaf';
+      leafNode.textContent = leaf;
+      leafNode.style.cssText = `left:${lx}px;top:${ly}px;transform:translate(-50%,-50%);`;
+      container.appendChild(leafNode);
+    });
+  });
+}
+
+// ============================================
+// TAB SWITCHING
+// ============================================
+function switchTab(tab, btn) {
+  document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else document.querySelector(`.output-tab[onclick*="${tab}"]`)?.classList.add('active');
+  const content = document.getElementById('tab-' + tab);
+  if (content) content.classList.add('active');
+}
+
+// ============================================
+// TOGGLE OPTIONS
+// ============================================
+function toggleOption(btn, key) {
+  APP.activeToggles[key] = !APP.activeToggles[key];
+  btn.classList.toggle('active', APP.activeToggles[key]);
+}
+
+// ============================================
+// ACTIONS
+// ============================================
+function copyContent() {
+  const activeTab = document.querySelector('.tab-content.active');
+  const text = activeTab ? activeTab.innerText : '';
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('success', 'Copied!', 'Content copied to clipboard.');
+  }).catch(() => {
+    showToast('error', 'Copy failed', 'Please copy manually.');
+  });
+}
+
+function downloadPDF() {
+  if (!APP.currentSummary) {
+    showToast('error', 'No summary', 'Please generate a summary first.');
+    return;
+  }
+  showLoader('Generating PDF...');
+  setTimeout(() => {
+    hideLoader();
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+      // Header
+      doc.setFillColor(124, 106, 247);
+      doc.rect(0, 0, 210, 20, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14); doc.setFont('helvetica','bold');
+      doc.text('SumTube.ai — Video Summary Report', 10, 13);
+
+      // Title
+      doc.setTextColor(20, 20, 30);
+      doc.setFontSize(16); doc.setFont('helvetica','bold');
+      doc.text(APP.currentSummary.title, 10, 35, { maxWidth: 190 });
+
+      // Meta
+      doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(120, 120, 130);
+      doc.text(`Duration: ${APP.currentSummary.duration} | Generated: ${new Date().toLocaleDateString()} | sumtube.ai`, 10, 50);
+
+      // Divider
+      doc.setDrawColor(230, 230, 240); doc.line(10, 54, 200, 54);
+
+      // Summary
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(80,80,100);
+      doc.text('SUMMARY', 10, 62);
+      doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,50);
+      const lines = doc.splitTextToSize(APP.currentSummary.summaryText, 190);
+      doc.text(lines, 10, 70);
+
+      let y = 70 + lines.length * 5 + 10;
+
+      // Key Concepts
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(80,80,100);
+      doc.text('KEY CONCEPTS', 10, y); y += 8;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(40,40,50);
+      doc.text(VIDEO_DATA.concepts.slice(0,8).join(' • '), 10, y, { maxWidth: 190 }); y += 12;
+
+      // Timestamps
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(80,80,100);
+      doc.text('TIMESTAMPS', 10, y); y += 8;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(40,40,50);
+      VIDEO_DATA.timestamps.forEach(t => {
+        if (y > 270) return;
+        doc.text(`[${t.time}] ${t.text}`, 10, y, { maxWidth: 190 }); y += 7;
+      });
+
+      // Footer
+      doc.setFontSize(8); doc.setTextColor(160,160,180);
+      doc.text('Generated by SumTube.ai — AI-Powered YouTube Summarizer', 10, 285);
+
+      doc.save(`sumtube-${APP.currentSummary.title.slice(0,20).replace(/\s+/g,'-')}.pdf`);
+      showToast('success', 'PDF Downloaded!', 'Your summary report is ready.');
+    } catch(e) {
+      showToast('error', 'PDF Error', 'Could not generate PDF. Please try again.');
+    }
+  }, 1200);
+}
+
+function openFocusMode() {
+  if (!APP.currentSummary) { showToast('error','No summary','Generate a summary first.'); return; }
+  document.getElementById('focusTitle').textContent = APP.currentSummary.title;
+  const paras = APP.currentSummary.summaryText.split('\n\n').filter(p => p.trim());
+  document.getElementById('focusBody').innerHTML = paras.map(p => `<p>${p}</p>`).join('');
+  document.getElementById('focusMode').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeFocus() {
+  document.getElementById('focusMode').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function startTTS() {
+  if (!APP.currentSummary) { showToast('error','No summary','Generate a summary first.'); return; }
+  document.getElementById('ttsTitle').textContent = APP.currentSummary.title;
+  document.getElementById('ttsBar').classList.add('show');
+  APP.ttsProgress = 0;
+  APP.ttsPlaying = true;
+  updateTTSIcon();
+  startTTSProgress();
+  showToast('info', 'Voice playback started', 'AI voice reading your summary.');
+}
+
+function toggleTTS() {
+  APP.ttsPlaying = !APP.ttsPlaying;
+  updateTTSIcon();
+  if (APP.ttsPlaying) startTTSProgress();
+  else { clearInterval(APP.ttsInterval); }
+}
+
+function updateTTSIcon() {
+  const icon = document.getElementById('ttsIcon');
+  if (icon) {
+    icon.setAttribute('data-lucide', APP.ttsPlaying ? 'pause' : 'play');
+    if (window.lucide) lucide.createIcons();
+  }
+  document.getElementById('ttsWave').style.display = APP.ttsPlaying ? 'flex' : 'none';
+}
+
+function startTTSProgress() {
+  clearInterval(APP.ttsInterval);
+  APP.ttsInterval = setInterval(() => {
+    if (!APP.ttsPlaying) { clearInterval(APP.ttsInterval); return; }
+    APP.ttsProgress = Math.min(100, APP.ttsProgress + 0.15);
+    document.getElementById('ttsSlider').value = APP.ttsProgress;
+    const total = 222;
+    const elapsed = Math.floor(APP.ttsProgress / 100 * total);
+    document.getElementById('ttsElapsed').textContent = `${Math.floor(elapsed/60)}:${String(elapsed%60).padStart(2,'0')}`;
+    if (APP.ttsProgress >= 100) {
+      clearInterval(APP.ttsInterval);
+      APP.ttsPlaying = false;
+      updateTTSIcon();
+      showToast('success', 'Playback complete', 'Summary finished reading.');
+    }
+  }, 100);
+}
+
+function seekTTS(val) { APP.ttsProgress = parseFloat(val); }
+function closeTTS() {
+  clearInterval(APP.ttsInterval);
+  APP.ttsPlaying = false;
+  document.getElementById('ttsBar').classList.remove('show');
+}
+
+function shareContent() {
+  if (navigator.share) {
+    navigator.share({ title: APP.currentSummary?.title || 'SumTube Summary', text: 'Check out this AI-generated summary!', url: window.location.href });
+  } else {
+    navigator.clipboard.writeText(window.location.href);
+    showToast('success', 'Link Copied!', 'Share link copied to clipboard.');
+  }
+}
+
+function saveSummary() {
+  showToast('success', 'Saved!', 'Summary saved to your library.');
+}
+
+function explainConcept(concept) {
+  showToast('info', concept, `"${concept}" is a fundamental concept in this field. Click to open a deep-dive article.`);
+}
+
+// ============================================
+// HISTORY PAGE
+// ============================================
+function renderHistory(data) {
+  document.getElementById('historyList').innerHTML = data.map(s => buildPastCard(s)).join('');
+  setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
+}
+
+function filterHistory(query) {
+  const filtered = SAMPLE_SUMMARIES.filter(s =>
+    s.title.toLowerCase().includes(query.toLowerCase()) ||
+    s.type.toLowerCase().includes(query.toLowerCase())
+  );
+  renderHistory(filtered);
+}
+
+let currentTypeFilter = 'all';
+function filterByType(type, btn) {
+  currentTypeFilter = type;
+  document.querySelectorAll('#page-history .toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = type === 'all' ? SAMPLE_SUMMARIES : SAMPLE_SUMMARIES.filter(s => s.type === type);
+  renderHistory(filtered);
+}
+
+// ============================================
+// CONTACT FORM
+// ============================================
+function submitContact() {
+  const name = document.getElementById('contactName').value.trim();
+  const email = document.getElementById('contactEmail').value.trim();
+  const msg = document.getElementById('contactMsg').value.trim();
+  let valid = true;
+
+  ['contactName','contactEmail','contactMsg'].forEach(id => document.getElementById(id).classList.remove('error'));
+  ['contactNameErr','contactEmailErr','contactMsgErr'].forEach(id => document.getElementById(id).classList.remove('show'));
+
+  if (!name) { setErr('contactName','contactNameErr'); valid = false; }
+  if (!email || !/\S+@\S+\.\S+/.test(email)) { setErr('contactEmail','contactEmailErr'); valid = false; }
+  if (!msg) { setErr('contactMsg','contactMsgErr'); valid = false; }
+  if (!valid) return;
+
+  showLoader('Sending message...');
+  setTimeout(() => {
+    hideLoader();
+    document.getElementById('contactForm').classList.add('hidden');
+    document.getElementById('contactSuccess').classList.remove('hidden');
+    showToast('success', 'Message sent!', 'We\'ll get back to you within 24 hours.');
+  }, 1500);
+}
+
+// ============================================
+// TOAST SYSTEM
+// ============================================
+function showToast(type, title, msg) {
+  const container = document.getElementById('toastContainer');
+  const icons = { success: 'check-circle', error: 'x-circle', info: 'info' };
+  const colors = { success: 'var(--c-green)', error: 'var(--c-red)', info: 'var(--c-amber)' };
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <div class="toast-icon" style="color:${colors[type]};">
+      <i data-lucide="${icons[type]||'bell'}" style="width:18px;height:18px;"></i>
+    </div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      <div class="toast-msg">${msg}</div>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">
+      <i data-lucide="x" style="width:14px;height:14px;"></i>
+    </button>
+  `;
+  container.appendChild(toast);
+  if (window.lucide) lucide.createIcons();
+  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 4000);
+}
+
+// ============================================
+// LOADER
+// ============================================
+function showLoader(text) {
+  document.getElementById('loaderText').textContent = text || 'Loading...';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('loaderOverlay').classList.add('show');
+}
+function hideLoader() {
+  document.getElementById('loaderOverlay').classList.remove('show');
+}
+
+// ============================================
+// SCROLL REVEAL
+// ============================================
+function initScrollReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+}
+
+// ============================================
+// STICKY NAV SCROLL EFFECT
+// ============================================
+window.addEventListener('scroll', () => {
+  const nav = document.getElementById('navbar');
+  if (window.scrollY > 20) {
+    nav.style.boxShadow = '0 4px 24px rgba(0,0,0,0.3)';
+  } else {
+    nav.style.boxShadow = 'none';
+  }
+});
+
+// ============================================
+// INIT
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Init Lucide icons
+  if (window.lucide) lucide.createIcons();
+
+  // Init scroll reveal
+  initScrollReveal();
+
+  // Add typing animation to hero input on landing
+  const heroInput = document.getElementById('heroUrl');
+  if (heroInput) {
+    const placeholder = 'https://youtube.com/watch?v=dQw4w9WgXcQ';
+    let idx = 0;
+    const typeIt = setInterval(() => {
+      heroInput.placeholder = placeholder.slice(0, idx++);
+      if (idx > placeholder.length) { clearInterval(typeIt); }
+    }, 45);
+  }
+
+  // Enter key for login/signup
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const activePage = document.querySelector('.page.active')?.id;
+      if (activePage === 'page-login') loginUser();
+      if (activePage === 'page-signup') signupUser();
+      if (activePage === 'page-dashboard') summarizeVideo();
+    }
+  });
+
+  // Initial icon pass after 200ms to ensure DOM is ready
+  setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 200);
+});
+</script>
+</body>
+</html>
